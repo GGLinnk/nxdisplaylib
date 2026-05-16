@@ -28,7 +28,7 @@ void Runner::deinit() {
     gfx_.deinit();
 }
 
-void Runner::switchTo(int index) {
+void Runner::select(int index) {
     if (index < 0 || index >= count_ || index == current_) return;
     views_[current_]->onExit();
     current_ = index;
@@ -53,7 +53,6 @@ void Runner::drawChrome(View* v) {
     }
 
     if (v->transparentChrome()) {
-        // No solid bars: shadowed text so the underlying view shows through.
         gfx_.drawTextShadow(12, 7, 2, accent, shadow, v->name());
         if (cfg_.showFps) gfx_.drawTextShadow(fpsX, 7, 2, fg, shadow, fps);
         gfx_.drawTextShadow(12, botY, 2, fg, shadow, v->controls());
@@ -67,26 +66,61 @@ void Runner::drawChrome(View* v) {
     }
 }
 
-void Runner::run() {
+const u32* Runner::step(const Input& in) {
+    // --- render-rate accounting ---
+    fpsAcc_ += in.dtSec;
+    fpsFrames_++;
+    if (fpsAcc_ >= 0.5) {
+        fpsValue_  = fpsFrames_ / fpsAcc_;
+        fpsAcc_    = 0.0;
+        fpsFrames_ = 0;
+    }
+
+    // --- navigation ---
     const int cycle = (cfg_.cycleCount > 0 && cfg_.cycleCount <= count_)
                           ? cfg_.cycleCount : count_;
+    View* v = views_[current_];
+    if (!v->capturesCycle()) {
+        if (in.down & HidNpadButton_ZR)
+            select((current_ + 1) % cycle);
+        else if (in.down & HidNpadButton_ZL)
+            select((current_ + cycle - 1) % cycle);
+    }
+    if (!v->capturesExit() && (in.down & HidNpadButton_B)) {
+        if (current_ != cfg_.homeIndex)
+            select(cfg_.homeIndex);
+        else if (cfg_.exitOnHomeBack)
+            exitRequested_ = true;
+    }
 
+    // --- update the active view ---
+    v = views_[current_];
+    v->update(in);
+    if (v->requestIndex >= 0) {
+        int req = v->requestIndex;
+        v->requestIndex = -1;
+        select(req);
+        v = views_[current_];
+    }
+
+    // --- render ---
+    gfx_.beginFrame();
+    v->render(gfx_);
+    if (v->showChrome())
+        drawChrome(v);
+    v->renderOverlay(gfx_);
+    const u32* px = gfx_.pixels();
+    gfx_.endFrame();
+    return px;
+}
+
+void Runner::run() {
     while (appletMainLoop()) {
-        // --- timing ---
         u64 now = armGetSystemTick();
         double dt = (double)armTicksToNs(now - lastTick_) / 1.0e9;
         lastTick_ = now;
         if (dt > 0.25) dt = 0.25;   // clamp after suspend / long stalls
 
-        fpsAcc_ += dt;
-        fpsFrames_++;
-        if (fpsAcc_ >= 0.5) {
-            fpsValue_  = fpsFrames_ / fpsAcc_;
-            fpsAcc_    = 0.0;
-            fpsFrames_ = 0;
-        }
-
-        // --- input ---
         padUpdate(&pad_);
         Input in;
         in.down   = padGetButtonsDown(&pad_);
@@ -97,42 +131,31 @@ void Runner::run() {
         in.dtSec  = dt;
         hidGetTouchScreenStates(&in.touch, 1);
 
-        // --- global navigation ---
+        // + leaves the app; the rest of navigation is handled inside step().
         View* v = views_[current_];
         if (!v->capturesExit() && (in.down & HidNpadButton_Plus))
-            break;  // return to hbmenu
+            break;
 
-        if (!v->capturesCycle()) {
-            if (in.down & HidNpadButton_ZR)
-                switchTo((current_ + 1) % cycle);
-            else if (in.down & HidNpadButton_ZL)
-                switchTo((current_ + cycle - 1) % cycle);
-        }
-        if (!v->capturesExit() && (in.down & HidNpadButton_B)) {
-            if (current_ != cfg_.homeIndex)
-                switchTo(cfg_.homeIndex);
-            else if (cfg_.exitOnHomeBack)
-                break;   // B on the home view: leave the app
-        }
-
-        // --- update active view ---
-        v = views_[current_];
-        v->update(in);
-        if (v->requestIndex >= 0) {
-            int req = v->requestIndex;
-            v->requestIndex = -1;
-            switchTo(req);
-            v = views_[current_];
-        }
-
-        // --- render ---
-        gfx_.beginFrame();
-        v->render(gfx_);
-        if (v->showChrome())
-            drawChrome(v);
-        v->renderOverlay(gfx_);   // drawn on top of the chrome bars
-        gfx_.endFrame();
+        step(in);
+        if (exitRequested_)
+            break;
     }
+}
+
+bool savePpm(const char* path, const u32* pixels) {
+    if (!pixels) return false;
+    FILE* f = fopen(path, "wb");
+    if (!f) return false;
+    fprintf(f, "P6\n%d %d\n255\n", Gfx::W, Gfx::H);
+    for (int i = 0; i < Gfx::W * Gfx::H; i++) {
+        u32 p = pixels[i];                       // R | G<<8 | B<<16 | A<<24
+        unsigned char rgb[3] = { (unsigned char)(p & 0xff),
+                                 (unsigned char)((p >> 8) & 0xff),
+                                 (unsigned char)((p >> 16) & 0xff) };
+        fwrite(rgb, 1, 3, f);
+    }
+    fclose(f);
+    return true;
 }
 
 } // namespace nxd

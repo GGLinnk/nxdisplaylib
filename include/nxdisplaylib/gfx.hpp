@@ -37,6 +37,10 @@ public:
     // Copy a full-screen WxH source buffer straight into the back buffer.
     void blitFull(const u32* src);
 
+    // The current back buffer (WxH RGBA8888). Valid only between beginFrame()
+    // and endFrame(); used by the recorder to capture rendered frames.
+    const u32* pixels() const { return buf_; }
+
     // --- text (8x8 glyphs, integer scaled) ---
     int  charW(int scale) const { return 8 * scale; }
     int  charH(int scale) const { return 8 * scale; }

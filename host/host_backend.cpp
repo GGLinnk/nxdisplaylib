@@ -19,6 +19,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <sys/stat.h>
 
 namespace {
 
@@ -106,7 +107,9 @@ Result framebufferCreate(Framebuffer*, NWindow*, u32, u32, u32, u32) {
     g.dumpPath = getenv("NXD_HOST_DUMP");
     if (const char* k = getenv("NXD_HOST_KEYS")) parseScript(k);
 
-    if (SDL_Init(SDL_INIT_VIDEO) == 0) {
+    // NXD_HOST_HEADLESS forces off-screen rendering (used by the asset
+    // generator so it never pops a window).
+    if (!getenv("NXD_HOST_HEADLESS") && SDL_Init(SDL_INIT_VIDEO) == 0) {
         g.window = SDL_CreateWindow("nxdisplaylib host",
                                     SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
                                     kW, kH, SDL_WINDOW_SHOWN);

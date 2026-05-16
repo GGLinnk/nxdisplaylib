@@ -17,6 +17,9 @@ struct RunnerConfig {
 // loop, dispatches input, handles navigation (ZL/ZR cycle, B-home, +-exit)
 // and draws the shared chrome (top bar with the view name + optional FPS,
 // bottom bar with the view's controls).
+//
+// run() is the live loop. step() / select() expose one frame at a time so a
+// recorder or test harness can drive the views headlessly.
 class Runner {
 public:
     // `views` must outlive the Runner. Returns false if the framebuffer fails.
@@ -24,11 +27,18 @@ public:
     void run();
     void deinit();
 
+    // Render exactly one frame for `in` (navigation, update, render, chrome);
+    // returns the rendered framebuffer (Gfx::W x Gfx::H), valid until the next
+    // frame. The live loop is just step() fed polled input.
+    const u32* step(const Input& in);
+    // Switch the active view by index (runs onExit / onEnter).
+    void select(int index);
+
     View* view(int i)   { return (i >= 0 && i < count_) ? views_[i] : nullptr; }
     int   count() const { return count_; }
+    int   current() const { return current_; }
 
 private:
-    void switchTo(int index);
     void drawChrome(View* v);
 
     Gfx          gfx_;
@@ -36,13 +46,18 @@ private:
     View**       views_   = nullptr;
     int          count_   = 0;
     int          current_ = 0;
+    bool         exitRequested_ = false;
     RunnerConfig cfg_;
 
     // Render-rate measurement (rolling average over ~0.5 s).
-    u64    lastTick_  = 0;
     double fpsAcc_    = 0.0;
     int    fpsFrames_ = 0;
     double fpsValue_  = 0.0;
+    u64    lastTick_  = 0;
 };
+
+// Write a Gfx::W x Gfx::H RGBA framebuffer as a binary PPM image. Returns
+// false on an I/O error. The lib's frame-capture primitive.
+bool savePpm(const char* path, const u32* pixels);
 
 } // namespace nxd
