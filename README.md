@@ -51,3 +51,19 @@ using namespace nxd;
 
 Clone with `--recursive` (or run `git submodule update --init`) so the library
 is present; CI checks out with `submodules: recursive`.
+
+## Host (PC) build
+
+`host/` lets the framework build and run on a desktop, no Switch or emulator.
+A mock `<switch.h>` (`nxd_host_libnx.h`) plus an SDL2 backend (`host_backend.cpp`)
+stand in for libnx, so the framework compiles unmodified.
+
+```sh
+cd host
+make run        # framework smoke test in an SDL2 window
+make headless   # 180 frames, no window, dump build/smoke.ppm
+```
+
+Needs `g++` and `libsdl2-dev`. Keyboard: arrows = D-pad, Z/X = A/B, A/S = Y/X,
+Q/W = L/R, 1/2 = ZL/ZR, Enter/RShift = +/-, Esc quits; mouse = touch.
+
