@@ -108,9 +108,12 @@ void Runner::run() {
             else if (in.down & HidNpadButton_ZL)
                 switchTo((current_ + cycle - 1) % cycle);
         }
-        if (!v->capturesExit() && (in.down & HidNpadButton_B) &&
-            current_ != cfg_.homeIndex)
-            switchTo(cfg_.homeIndex);
+        if (!v->capturesExit() && (in.down & HidNpadButton_B)) {
+            if (current_ != cfg_.homeIndex)
+                switchTo(cfg_.homeIndex);
+            else if (cfg_.exitOnHomeBack)
+                break;   // B on the home view: leave the app
+        }
 
         // --- update active view ---
         v = views_[current_];

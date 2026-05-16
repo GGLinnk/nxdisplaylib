@@ -6,10 +6,11 @@ namespace nxd {
 
 // Behaviour knobs for the Runner.
 struct RunnerConfig {
-    int  homeIndex   = 0;     // view B returns to
-    int  cycleCount  = 0;     // ZL/ZR cycle spans indices [0,cycleCount); 0 => all
-    bool showFps     = false; // draw a live render-rate readout in the top bar
-    bool initGesture = false; // also bring up the HID gesture subsystem
+    int  homeIndex     = 0;   // view B returns to
+    int  cycleCount    = 0;   // ZL/ZR cycle spans indices [0,cycleCount); 0 => all
+    bool showFps       = false; // draw a live render-rate readout in the top bar
+    bool initGesture   = false; // also bring up the HID gesture subsystem
+    bool exitOnHomeBack= false; // B on the home view exits (else it does nothing)
 };
 
 // Hosts a set of Views: owns the renderer and input device, runs the main
