@@ -47,6 +47,7 @@ struct Host {
     int       scriptN = 0;
 
     std::chrono::steady_clock::time_point start;
+    std::chrono::steady_clock::time_point lastPresent;
 } g;
 
 // Map a button name to its mask (a/b/x/y, l/r/zl/zr, up/down/left/right, +/-).
@@ -143,6 +144,11 @@ void framebufferEnd(Framebuffer*) {
         SDL_RenderClear(g.renderer);
         SDL_RenderCopy(g.renderer, g.texture, nullptr, nullptr);
         SDL_RenderPresent(g.renderer);
+        // Hard-cap at 60 fps regardless of the display's refresh rate.
+        const auto target = std::chrono::microseconds(16667);
+        auto elapsed = std::chrono::steady_clock::now() - g.lastPresent;
+        if (elapsed < target) std::this_thread::sleep_for(target - elapsed);
+        g.lastPresent = std::chrono::steady_clock::now();
     } else {
         // Headless: throttle to roughly real time so background probe workers
         // run and complete as they would against a live window.
